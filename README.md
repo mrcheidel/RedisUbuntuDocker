@@ -19,5 +19,8 @@ http://joeferner.github.io/redis-commander/
 
 	docker exec -i -t redis_instance /bin/bash
 
+  Enter to Web Admin UI
+  
+	http://localhost:8081
 
 Claudio Heidel
