@@ -1,3 +1,6 @@
+# Created by Claudio Heidel
+# https://github.com/mrcheidel/RedisUbuntuDocker
+
 FROM ubuntu:16.04
 
 RUN apt-get update
