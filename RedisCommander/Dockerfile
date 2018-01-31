@@ -39,7 +39,7 @@ CMD ["redis-commander"]
 # docker build -t redis-server .
 
 # Create Docker Instance from Docker Image
-# docker run -d --name rediscommander_instance -h rediscommander_instance -p 6379:6379 -p 8081:8081 -t rediscommander-server -m 512m
+# docker run -d --name rediscommander_instance -h rediscommander_instance -p 8081:8081 -t rediscommander-server 
 
 # Enter in docker as shell
 # docker exec -i -t rediscommander_instance /bin/bash
