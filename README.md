@@ -22,6 +22,7 @@ If you are running over Mac, Docker run over a VirtualBox machine and do you nee
 	ifconfig --format=unix | grep 'vboxnet0' -A 1  | grep 'inet'| cut -d\  -f2
 
 
+redis-commander.json content:
 
 	{
 	  "sidebarWidth":250,
