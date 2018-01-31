@@ -15,11 +15,12 @@ http://joeferner.github.io/redis-commander/
 
 ### Install Redis Commander (Redis Admin Web UI)
 
-Edit the filename **redis-commander.json** and update the **host** value parameter
+Edit the filename **redis-commander.json** and update the **host** value parameter with you docker-machine ip-address
 
-If you are running over Mac, Docker run over a VirtualBox machine and do you need find the ip-address for the Docker Host.
+If you are running over Mac, Docker run over a VirtualBox machine and do you need find the docker-machine ip-address:
 
 	ifconfig --format=unix | grep 'vboxnet0' -A 1  | grep 'inet'| cut -d\  -f2
+
 
 
 	{
