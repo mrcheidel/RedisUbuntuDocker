@@ -32,7 +32,7 @@ redis-commander.json content:
 	  "default_connections": [
 		{
 		  "label":"local",
-		  **"host":"192.168.99.1",**
+		  "host":"192.168.99.1",
 		  "port":"6379",
 		  "password":"",
 		  "dbIndex":0
