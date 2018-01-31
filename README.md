@@ -7,21 +7,19 @@ http://joeferner.github.io/redis-commander/
 
 ## How to use
 
+### Install Redis Server
 
-## Install Redis Server
-
-  ./RedisServer/install.sh
+	./RedisServer/install.sh
 
 
-## Install Redis Commander (Redis Admin Web UI)
+### Install Redis Commander (Redis Admin Web UI)
 
 
 Edit the filename **redis-commander.json** and update the **host** value parameter
 
 If you are running over Mac, Docker run over a VirtualBox machine and do you need find the ip-address for the Docker Host.
 
-  ifconfig --format=unix | grep 'vboxnet0' -A 1  | grep 'inet'| cut -d\  -f2
-  
+	ifconfig --format=unix | grep 'vboxnet0' -A 1  | grep 'inet'| cut -d\  -f2
 
 	{
 	  "sidebarWidth":250,
@@ -43,7 +41,7 @@ Then run the installer
 
   ./RedisCommander/install.sh
 
-## Enter to Web Admin UI
+### Enter to Web Admin UI
   
 	http://localhost:8081
 
