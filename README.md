@@ -22,7 +22,9 @@ Linux
 	cd RedisCommander
 	./install.sh
 
+
 Mac
+
 	cd RedisCommander
 	./install_mac.sh
 
