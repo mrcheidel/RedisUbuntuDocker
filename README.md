@@ -21,6 +21,7 @@ If you are running over Mac, Docker run over a VirtualBox machine and do you nee
 
 	ifconfig --format=unix | grep 'vboxnet0' -A 1  | grep 'inet'| cut -d\  -f2
 
+
 	{
 	  "sidebarWidth":250,
 	  "locked":false,
@@ -39,7 +40,7 @@ If you are running over Mac, Docker run over a VirtualBox machine and do you nee
 
 Then run the installer
 
-  ./RedisCommander/install.sh
+	./RedisCommander/install.sh
 
 ### Enter to Web Admin UI
   
