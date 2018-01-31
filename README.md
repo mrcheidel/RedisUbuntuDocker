@@ -15,35 +15,17 @@ http://joeferner.github.io/redis-commander/
 
 ### Install Redis Commander (Redis Admin Web UI)
 
-Edit the filename **redis-commander.json** and update the **host** value parameter with you docker-machine ip-address
+If you are running over **Mac OS**, Docker run over a VirtualBox machine and do you need find the docker-machine ip-address.
 
-If you are running over Mac, Docker run over a VirtualBox machine and do you need find the docker-machine ip-address:
-
-	ifconfig --format=unix | grep 'vboxnet0' -A 1  | grep 'inet'| cut -d\  -f2
-
-
-redis-commander.json content:
-
-	{
-	  "sidebarWidth":250,
-	  "locked":false,
-	  "CLIHeight":50,
-	  "CLIOpen":false,
-	  "default_connections": [
-		{
-		  "label":"local",
-		  "host":"192.168.99.1",
-		  "port":"6379",
-		  "password":"",
-		  "dbIndex":0
-		}
-	  ]
-	}
-
-Then run the installer
+Linux
 
 	cd RedisCommander
 	./install.sh
+
+Mac
+	cd RedisCommander
+	./install_mac.sh
+
 
 ### Enter to Web Admin UI
   

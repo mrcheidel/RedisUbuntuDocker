@@ -6,7 +6,7 @@
   "default_connections": [
     {
       "label":"local",
-      "host":"192.168.99.1",
+      "host":"localhost",
       "port":"6379",
       "password":"",
       "dbIndex":0

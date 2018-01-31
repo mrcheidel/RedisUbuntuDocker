@@ -1,5 +1,6 @@
-# Created by Claudio Heidel
 # https://github.com/mrcheidel/RedisUbuntuDocker
+
+LABEL maintainer="Claudio Heidel"
 
 FROM ubuntu:16.04
 
@@ -33,8 +34,6 @@ RUN \
 
 RUN sed -i 's/protected-mode yes/protected-mode no/g' /etc/redis/redis.conf
 #RUN sed -i 's/# daemonize no/daemonize yes/g' /etc/redis/redis.conf  
-	
-	
 
 # Define mountable directories.
 VOLUME ["/data"]
@@ -50,7 +49,7 @@ ENTRYPOINT ["redis-server", "/etc/redis/redis.conf"]
 # docker build -t redis-server .
 
 # Create Docker Instance from Docker Image
-# docker run -d --name redis_instance -h redis_instance -p 6379:6379 -p 8081:8081 -t redis-server -m 512m
+# docker run -d --name redis_instance -h redis_instance -p 6379:6379 -p 8081:8081 -t redis-server
 
 # Enter in docker as shell
 # docker exec -i -t redis_instance /bin/bash

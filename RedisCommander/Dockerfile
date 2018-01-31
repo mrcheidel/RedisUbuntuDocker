@@ -13,7 +13,6 @@ RUN \
   apt-get install -y nano && \
   apt-get install -y npm 
 
-
 # Redis Commander
 RUN \
   adduser redis-commander && \
@@ -33,7 +32,6 @@ ADD entrypoint.sh /usr/bin/entrypoint
 EXPOSE 8081
 
 CMD ["redis-commander"]
-
 
 # Build Docker Image
 # docker build -t redis-server .
