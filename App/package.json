@@ -1,0 +1,23 @@
+{
+  "name": "ss",
+  "version": "1.0.0",
+  "description": "Socket Server",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "mrcheidel"
+  },
+  "keywords": [
+    "websocket",
+    "redis",
+    "chat"
+  ],
+  "author": "Claudio Heidel Schemberger",
+  "license": "ISC",
+  "dependencies": {
+    "redis": "^2.8.0"
+  }
+}
