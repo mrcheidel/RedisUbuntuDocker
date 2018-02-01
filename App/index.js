@@ -8,9 +8,10 @@ redis = require("redis");
 var clients = [];
 var redis_host   = 'localhost';
 var redis_port   = 6379;
-var serv_pfx     = 'microsev_socket_';
+var serv_pfx     = 'microserv_socket_';
 var serv_timeout = 30; //seconds
 var serv_channel;
+var serv_subcriber;
 
 // Start a TCP Server
 const server = net.createServer(function(socket) {
@@ -23,19 +24,12 @@ const server = net.createServer(function(socket) {
 
     socket.sub = redis.createClient(redis_port, redis_host);
     socket.pub = redis.createClient(redis_port, redis_host);
-    
-    socket.sub.subscribe(serv_channel);
-
+ 
     // Put this new client in the list
     clients.push(socket);
 
     socket.sub.on("message", function(channel, message) {
-        //If the channel is the microservice topic, resend the data to the socket.
-    	if (channel == serv_channel) {
-    		socket.emit ('data', message);
-    	} else {
-        	socket.write("sub channel " + channel + ": " + message + '\n');
-        }
+        socket.write("sub channel " + channel + ": " + message + '\n');
     });
 
     socket.on('error', function(err) {
@@ -94,12 +88,16 @@ const server = net.createServer(function(socket) {
                     break;
 
                 case 'msg':
-                    var username = d[1].trim();
-                    var msgdata = d[2];
-                    if (msgto(msgdata + "\n", username)) {
-                        socket.write('OK\n');
+                    if (d.length == 3) {
+						var username = d[1].trim();
+						var msgdata  = d[2];
+						if (msgto(msgdata , username, socket.username)) {
+							socket.write('OK\n');
+						} else {
+							socket.write('KO\n');
+						}
                     } else {
-                        socket.write('KO\n');
+                    	socket.write('bad syntax: msg <target_username> <text_message>\n');
                     }
                     break;
 
@@ -149,7 +147,71 @@ const server = net.createServer(function(socket) {
         broadcast(socket.name + " left the server.\n");
     });
 
+}).on('listening', () => {
+  // handle errors here
+   console.log('Socker server running at port', server.address().port);
+   
+   serv_subcriber = redis.createClient(redis_port, redis_host);
+   
+   //  Add Data for the Discovery Process
+   serv_channel = serv_pfx + server.address().port;
+   serv_subcriber.set(serv_channel , JSON.stringify(server.address()), redis.print);
+   serv_subcriber.expire (serv_channel, serv_timeout);
 
+   // Add KeepAlive 
+   setInterval(
+   		function(){
+			var serv_subcriber = redis.createClient(redis_port, redis_host);
+   			serv_subcriber.expire (serv_channel, serv_timeout);
+   		}, 
+   		(serv_timeout / 2) * 1000);
+   		
+   	
+   	serv_subcriber.subscribe(serv_channel); 
+   	serv_subcriber.on("message", function(channel, message) {
+   	     process.stdout.write('channel->' + channel);
+   	     process.stdout.write('message->' + message);
+   		if (channel == serv_channel) {
+            var d = csplit(message.toString('ascii'), ' ', 3);
+            if (d.length == 0) return;
+            switch (d[0].toLowerCase()) {
+                case 'msg':  // publish microserv_socket_49669 msg Pedro Claudio Hola amigo
+                    var from = d[1].trim();
+                    var to   = d[2];
+                    var msg  = d[3];
+                    msgto(msg , to, from);
+                    break;
+                    
+                default:
+                    process.stdout.write('serv_subcriber->' + data);
+            }
+        }
+    });
+   	
+   	
+
+}).listen();
+
+
+    // Send to a specific username
+    function msgto(message, to, from) {
+        var res = false;
+        clients.forEach(function(client) {
+            // Don't want to send it to sender
+            if (client.username == to) {
+                client.write("from " + from + ": " + message);
+                res = true;
+                return;
+            }
+        });
+        
+        if(!res) {
+            // TODO
+        	// This username isn't on the this instance, try to send in other instances.
+        }
+        return res;
+    }
+    
     function csplit(data, delimiter, counter) {
         var d = data.split(delimiter);
         var r = [];
@@ -161,9 +223,8 @@ const server = net.createServer(function(socket) {
                 break;
             }
         }
-        return r
+        return r;
     }
-
 
     // Send to a specific username
     function userlist() {
@@ -171,22 +232,6 @@ const server = net.createServer(function(socket) {
         clients.forEach(function(client) {
             if (client.username) res.push(client.username);
         });
-        return res;
-    }
-
-    // Send to a specific username
-    function msgto(message, username) {
-        var res = false;
-        clients.forEach(function(client) {
-            // Don't want to send it to sender
-            if (client.username == username) {
-                client.write(message);
-                res = true;
-                return;
-            }
-        });
-        // Log it to the server output too
-        process.stdout.write('msgto->' + username + ':' + message);
         return res;
     }
 
@@ -204,7 +249,6 @@ const server = net.createServer(function(socket) {
         return res;
     }
 
-
     // Send a message to all clients
     function broadcast(message, sender) {
         clients.forEach(function(client) {
@@ -215,24 +259,4 @@ const server = net.createServer(function(socket) {
         // Log it to the server output too
         process.stdout.write(message)
     }
-
-
-}).on('listening', () => {
-  // handle errors here
-   console.log('Socker server running at port', server.address());
-   
-   //  Add Data for the Discovery Process
-   var discovery = redis.createClient(redis_port, redis_host);
-   serv_channel = serv_pfx + server.address().port;
-   discovery.set(serv_channel , JSON.stringify(server.address()), redis.print);
-   discovery.expire (serv_channel, serv_timeout);
-
-   // Add KeepAlive 
-   setInterval(function()
-   		{
-    		var ka = redis.createClient(redis_port, redis_host);
-   			ka.expire (serv_channel, serv_timeout);
-   		}, (serv_timeout / 2) * 1000);
-
-}).listen();
-
+    
