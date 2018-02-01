@@ -169,8 +169,6 @@ const server = net.createServer(function(socket) {
    	
    	serv_subcriber.subscribe(serv_channel); 
    	serv_subcriber.on("message", function(channel, message) {
-   	     process.stdout.write('channel->' + channel);
-   	     process.stdout.write('message->' + message);
    		if (channel == serv_channel) {
             var d = csplit(message.toString('ascii'), ' ', 3);
             if (d.length == 0) return;
@@ -182,8 +180,12 @@ const server = net.createServer(function(socket) {
                     msgto(msg , to, from);
                     break;
                     
+                case 'kill':
+                    kill(d[1]);
+                    break;
+                    
                 default:
-                    process.stdout.write('serv_subcriber->' + data);
+                    process.stdout.write('serv_subcriber->' + message);
             }
         }
     });
