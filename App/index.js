@@ -107,6 +107,9 @@ const server = net.createServer(function(socket) {
                         socket.sub.set(d[1].trim() , JSON.stringify ({"instance" : serv_channel }));
 						socket.sub.expire (d[1].trim(), socket_timeout * 2);
                         socket.write('Welcome ' + socket.username + "\n");
+                        
+                        
+                         
                     }
                     break;
 
@@ -127,7 +130,16 @@ const server = net.createServer(function(socket) {
                     if (d.length == 3) {
 						var username = d[1].trim();
 						var msgdata  = d[2];
-						socket.write(msgto(msgdata , username, socket.username) + "\n");
+						socket.sub.get (username, function(err, userdata) {
+							if(!err) {
+								if (userdata!=null) {
+									userdata = JSON.parse(userdata);
+        							msgto (msgdata , username, socket.username, userdata.instance);
+        						} else {
+        							socket.write(username + ' - User not found\n');
+        						}
+        					}
+   						 });
                     } else {
                     	socket.write('bad syntax: msg <target_username> <text_message>\n');
                     }
@@ -208,7 +220,7 @@ const server = net.createServer(function(socket) {
 				var from = d[1].trim();
 				var to   = d[2];
 				var msg  = d[3];
-				msgto(msg , to, from);
+				msgto(msg , to, from, channel);
 				break;
 				
 			case 'kill':
@@ -226,22 +238,19 @@ const server = net.createServer(function(socket) {
 
 
     // Send to a specific username
-    function msgto(message, to, from) {
-        var res = 0;
-        clients.forEach(function(client) {
-            // Don't want to send it to sender
-            if (client.username == to) {
-                client.write("from " + from + ": " + message);
-                res = 1;
-                return;
-            }
-        });
-        
-        if(res == 0) {
-            // TODO
-        	// This username isn't on the this instance, try to send in other instances.
+    function msgto(message, to, from, instance) {
+        if (instance!=serv_channel) {
+        	serv_subcriber = redis.createClient(redis_port, redis_host);
+        	serv_subcriber.publish(instance, 'msg ' + from + ' ' + to + ' ' + message);
+        } else {
+			clients.forEach(function(client) {
+				// Don't want to send it to sender
+				if (client.username == to) {
+					client.write("from " + instance + "." + from + ": " + message + "\n");
+					return;
+				}
+			});
         }
-        return res;
     }
     
     function csplit(data, delimiter, counter) {
