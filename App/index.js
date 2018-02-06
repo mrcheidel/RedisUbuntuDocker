@@ -1,48 +1,55 @@
 #!/usr/bin/env node
 
 // Load the TCP Library
-net   = require('net');
-redis = require("redis");
+net      = require('net');
+redis    = require("redis");
+freeport = require("find-free-port");
+
 
 // Keep track of the clients
-var clients = [];
-var redis_host   = 'localhost';
-var redis_port   = 6379;
-var serv_pfx     = 'microserv_socket_';
-var serv_timeout = 30; //seconds
+var clients        = [];
+var redis_host     = 'localhost';
+var redis_port     = 6379;
+var serv_pfx       = 'microserv_socket_';
+var serv_timeout   = 10; //seconds
 var serv_channel;
-var serv_subcriber;
-var socket_timeout = 30000; //seconds
+var socket_timeout = 10; //seconds
+var serv_subcriber = redis.createClient(redis_port, redis_host);
+var serv_publisher = redis.createClient(redis_port, redis_host);
+ 
+
+freeport(5000, 5100, function(err, freePort){
+
+//clear screen
+console.log('\033[2J');
 
 // Start a TCP Server
 const server = net.createServer(function(socket) {
+
 
     // Identify this client
     socket.name = socket.remoteAddress + ":" + socket.remotePort;
     socket.username = null;
 
-    //broadcast(socket.name + " joined \n", socket);
-
-    socket.sub = redis.createClient(redis_port, redis_host);
-    socket.pub = redis.createClient(redis_port, redis_host);
- 
     // Put this new client in the list
     clients.push(socket);
     
-	socket.setTimeout(socket_timeout);
+	socket.setTimeout(socket_timeout * 1000);
 	
 	socket.on('timeout', () => {
 		if (socket.username!== null) {
-			socket.sub.expire (socket.username, socket_timeout * 2);
+			serv_publisher.expire (socket.username, socket_timeout * 2);
 		}
 	});
 
-    socket.sub.on("message", function(channel, message) {
-        socket.write("sub channel " + channel + ": " + message + '\n');
-    });
+    //socket.sub.on("message", function(channel, message) {
+    //    socket.write("sub channel " + channel + ": " + message + '\n');
+    //});
 
-    socket.on('error', function(err) {
-        process.stdout.write(err.stack);
+    socket.on('error', function(exception) {
+        console.log ("\n-- Error --------------------------------------\n");
+         console.log (exception);
+         console.log (exception.stack);
     });
 
     // Handle incoming messages from clients.
@@ -57,7 +64,7 @@ const server = net.createServer(function(socket) {
                     if (d.length > 2) {
                         var channel = d[1].trim();
                         var msg = d[2];
-                        socket.pub.publish(channel, msg, function(err, res) {
+                        serv_publisher.publish(channel, msg, function(err, res) {
                             if(err!==null) {
                             	socket.write(err.toString() + "\n");
                             } else {
@@ -71,7 +78,7 @@ const server = net.createServer(function(socket) {
                     if (d.length > 1) {
                         if (socket.sub) {
                             var channel = d[1].trim();
-                            socket.sub.subscribe(channel, function(err, res) {
+                            serv_subscriber.subscribe(channel, function(err, res) {
 								if(err!==null) {
 									socket.write(err.toString() + "\n");
 								} else {
@@ -86,7 +93,7 @@ const server = net.createServer(function(socket) {
                     if (d.length > 1) {
                         if (socket.sub) {
                             var channel = d[1].trim();
-                            socket.sub.unsubscribe(channel, function(err, res) {
+                            serv_subscriber.unsubscribe(channel, function(err, res) {
 								if(err!==null) {
 									socket.write(err.toString() + "\n");
 								} else {
@@ -100,22 +107,19 @@ const server = net.createServer(function(socket) {
                 case 'login':
                     if (d.length > 1) {
                     	if (socket.username != null) {
-                    		socket.sub.del(socket.username);
+                    		serv_publisher.del(socket.username);
                     		socket.username = null;
                     	}
                         socket.username = d[1].trim();
-                        socket.sub.set(d[1].trim() , JSON.stringify ({"instance" : serv_channel }));
-						socket.sub.expire (d[1].trim(), socket_timeout * 2);
-                        socket.write('Welcome ' + socket.username + "\n");
-                        
-                        
-                         
+                        serv_publisher.set(d[1].trim() , JSON.stringify ({"instance" : serv_channel , "name": socket.name}));
+						serv_publisher.expire (d[1].trim(), socket_timeout * 2);
+                        socket.write('Welcome ' + socket.username + "\n");     
                     }
                     break;
 
                 case 'logout':
                     if (socket.username != null) {
-                    	socket.sub.del(socket.username);
+                    	serv_publisher.del(socket.username);
                     	socket.username = null;
                     	socket.write('Logout OK\n');
                     }
@@ -130,7 +134,7 @@ const server = net.createServer(function(socket) {
                     if (d.length == 3) {
 						var username = d[1].trim();
 						var msgdata  = d[2];
-						socket.sub.get (username, function(err, userdata) {
+						serv_publisher.get (username, function(err, userdata) {
 							if(!err) {
 								if (userdata!=null) {
 									userdata = JSON.parse(userdata);
@@ -156,12 +160,17 @@ const server = net.createServer(function(socket) {
                     break;
 
                 case 'kill':
-                    var username = d[1];
-                    if (kill(username)) {
-                        socket.write('OK\n');
-                    } else {
-                        socket.write('KO\n');
-                    }
+                	var username = d[1];
+					serv_publisher.get (username, function(err, userdata) {
+						if(!err) {
+							if (userdata!=null) {
+								userdata = JSON.parse(userdata);
+								kill (username, userdata.instance);
+							} else {
+								socket.write(username + ' - User not found\n');
+							}
+						}
+					 });
                     break;
 
                 case 'whoishere':
@@ -169,7 +178,7 @@ const server = net.createServer(function(socket) {
                     break;
                     
                 case 'listinstances':
-					socket.pub.keys(serv_pfx + '*', function (err, keys) {
+					serv_publisher.keys(serv_pfx + '*', function (err, keys) {
 						if (err) return process.stdout.write(err);
 						socket.write(keys.join('\n') + '\n');
 					});
@@ -184,20 +193,18 @@ const server = net.createServer(function(socket) {
 
     // Remove the client from the list when it leaves
     socket.on('end', function() {
-        if (socket.username != null) socket.sub.del(socket.username);
-        socket.sub.unsubscribe();
-        socket.sub.quit();
-        socket.pub.quit();
+        if (socket.username != null) serv_publisher.del(socket.username);
         clients.splice(clients.indexOf(socket), 1);
         broadcast(socket.name + " left the server.\n");
     });
+    
+	socket.write ("#\n");
 
 }).on('listening', () => {
   // handle errors here
    console.log('Socker server running at port', server.address().port);
    
    //  Add Data for the Discovery Process
-   serv_subcriber = redis.createClient(redis_port, redis_host);
    serv_channel = serv_pfx + server.address().port;
    serv_subcriber.set(serv_channel , JSON.stringify(server.address()));
    serv_subcriber.expire (serv_channel, serv_timeout);
@@ -208,8 +215,8 @@ const server = net.createServer(function(socket) {
 			var serv_subcriber = redis.createClient(redis_port, redis_host);
 			serv_subcriber.set(serv_channel , JSON.stringify(server.address()));
 			serv_subcriber.expire (serv_channel, serv_timeout);
-   		}, 
-   		(serv_timeout / 2) * 1000);
+   		}, (serv_timeout / 2) * 1000);
+
 
    	serv_subcriber.subscribe(serv_channel); 
    	serv_subcriber.on("message", function(channel, message) {
@@ -224,17 +231,22 @@ const server = net.createServer(function(socket) {
 				break;
 				
 			case 'kill':
-				kill(d[1]);
+				kill(d[1], channel);
 				break;
 				
 			default:
 				process.stdout.write('serv_subcriber->' + message + "\n");
 		}
     });
-   	
-   	
+	
 
-}).listen();
+}).listen({
+  host: 'localhost',
+  port: freePort
+});
+
+
+});
 
 
     // Send to a specific username
@@ -246,11 +258,28 @@ const server = net.createServer(function(socket) {
 			clients.forEach(function(client) {
 				// Don't want to send it to sender
 				if (client.username == to) {
-					client.write("from " + instance + "." + from + ": " + message + "\n");
-					return;
+					if (client.writable) {
+						client.write("from " + instance + "." + from + ": " + message + "\n");
+					}
+					return;	
 				}
 			});
         }
+    }
+    
+    // kill all sockets for an username
+    function kill(username, instance) {
+        if (instance!=serv_channel) {
+        	serv_subcriber = redis.createClient(redis_port, redis_host);
+        	serv_subcriber.publish(instance, 'kill ' + username);
+        } else {
+			clients.forEach(function(client) {
+				// Don't want to send it to sender
+				if (client.username == username) {
+					client.end();
+				}
+			});
+ 		}
     }
     
     function csplit(data, delimiter, counter) {
@@ -276,28 +305,29 @@ const server = net.createServer(function(socket) {
         return res;
     }
 
-    // kill all sockets for an username
-    function kill(username) {
-        var res = false;
-        clients.forEach(function(client) {
-            // Don't want to send it to sender
-            if (client.username == username) {
-                client.end();
-            }
-        });
-        // Log it to the server output too
-        process.stdout.write('kill->' + username);
-        return res;
-    }
-
     // Send a message to all clients
     function broadcast(message, sender) {
         clients.forEach(function(client) {
             // Don't want to send it to sender
             if (client === sender) return;
-            client.write(message);
+            if (client.writable) client.write(message);
         });
-        // Log it to the server output too
-        process.stdout.write(message)
     }
+
+	function getPort (cb) {
+		var port = socket_port
+		socket_port += 1
+
+		var server = net.createServer()
+			server.listen(port, function (err) {
+			server.once('close', function () {
+			cb(port)
+		})
+		server.close()
+		})
+		server.on('error', function (err) {
+			getPort(cb)
+		})
+	}
+    
     
