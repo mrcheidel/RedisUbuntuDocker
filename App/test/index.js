@@ -19,18 +19,16 @@ function Dummy(i){
     	if (data.toString() == "#\n"){
     		this.write('login ' + this.user +'\n');
     		setTimeout((function () {
-    			this.write('msg ' + this.user +' Hola\n');
-    			//this.end();	
-    		}).bind(this), 1000);
-    		
-    		setTimeout((function () {
-    			this.end();	
-    		}).bind(this), 5000);
-    		
+    			this.write('msg Claudio Hola\n');
+    			
+				//setTimeout((function () {
+					this.end();	
+				//}).bind(this), 5000);
+    		}).bind(this), 2000);
+
     	} else {
     		console.log (data.toString());
     	}
-
     });
 
     this.socket.on('error', function(exception) {
@@ -46,6 +44,6 @@ function Dummy(i){
     this.socket.connect(5000, '127.0.0.1');
 }
 
-for (var i = 0; i < 15000; i++) {
+for (var i = 0; i < 5000; i++) {
     clients.push(new Dummy(i));
 };

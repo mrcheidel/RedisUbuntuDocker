@@ -195,7 +195,8 @@ const server = net.createServer(function(socket) {
     socket.on('end', function() {
         if (socket.username != null) serv_publisher.del(socket.username);
         clients.splice(clients.indexOf(socket), 1);
-        broadcast(socket.name + " left the server.\n");
+        console.log (socket.name + " left the server.\n");
+        //broadcast(socket.name + " left the server.\n");
     });
     
 	socket.write ("#\n");
