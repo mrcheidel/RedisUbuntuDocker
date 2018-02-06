@@ -7,16 +7,18 @@ freeport = require("find-free-port");
 
 
 // Keep track of the clients
-var clients        = [];
-var redis_host     = 'localhost';
-var redis_port     = 6379;
-var serv_pfx       = 'microserv_socket_';
-var serv_timeout   = 10; //seconds
+var clients         = [];
+var redis_host      = 'localhost';
+var redis_port      = 6379;
+var serv_pfx        = 'microserv_socket_';
+var serv_timeout    = 10; //seconds
 var serv_channel;
-var socket_timeout = 10; //seconds
-var serv_subcriber = redis.createClient(redis_port, redis_host);
-var serv_publisher = redis.createClient(redis_port, redis_host);
- 
+var socket_timeout  = 10; //seconds
+var serv_subscriber = redis.createClient(redis_port, redis_host);
+var serv_publisher  = redis.createClient(redis_port, redis_host);
+const fs = require('fs');
+
+
 
 freeport(5000, 5100, function(err, freePort){
 
@@ -26,30 +28,25 @@ console.log('\033[2J');
 // Start a TCP Server
 const server = net.createServer(function(socket) {
 
-
     // Identify this client
     socket.name = socket.remoteAddress + ":" + socket.remotePort;
     socket.username = null;
-
     // Put this new client in the list
     clients.push(socket);
-    
 	socket.setTimeout(socket_timeout * 1000);
-	
+
 	socket.on('timeout', () => {
 		if (socket.username!== null) {
 			serv_publisher.expire (socket.username, socket_timeout * 2);
 		}
 	});
 
-    //socket.sub.on("message", function(channel, message) {
-    //    socket.write("sub channel " + channel + ": " + message + '\n');
-    //});
-
     socket.on('error', function(exception) {
-        console.log ("\n-- Error --------------------------------------\n");
-         console.log (exception);
-         console.log (exception.stack);
+		console.log ("\n-- Error --------------------------------------\n");
+		console.log (exception.stack);
+		fs.appendFile('error.log', "\n-- Error --------------------------------------\n" + exception.stack + "\n", function (err) {
+  			if (err) throw err;
+		});  
     });
 
     // Handle incoming messages from clients.
@@ -66,9 +63,9 @@ const server = net.createServer(function(socket) {
                         var msg = d[2];
                         serv_publisher.publish(channel, msg, function(err, res) {
                             if(err!==null) {
-                            	socket.write(err.toString() + "\n");
+                            	if (socket.writable) socket.write(err.toString() + "\n");
                             } else {
-                            	socket.write(res.toString() + "\n");
+                            	if (socket.writable) socket.write(res.toString() + "\n");
                             }
                         });
                     }
@@ -80,9 +77,9 @@ const server = net.createServer(function(socket) {
                             var channel = d[1].trim();
                             serv_subscriber.subscribe(channel, function(err, res) {
 								if(err!==null) {
-									socket.write(err.toString() + "\n");
+									if (socket.writable) socket.write(err.toString() + "\n");
 								} else {
-									socket.write(res.toString() + "\n");
+									if (socket.writable) socket.write(res.toString() + "\n");
 								}
 							});
                         }
@@ -95,9 +92,9 @@ const server = net.createServer(function(socket) {
                             var channel = d[1].trim();
                             serv_subscriber.unsubscribe(channel, function(err, res) {
 								if(err!==null) {
-									socket.write(err.toString() + "\n");
+									if (socket.writable) socket.write(err.toString() + "\n");
 								} else {
-									socket.write(res.toString() + "\n");
+									if (socket.writable) socket.write(res.toString() + "\n");
 								}
 							});
                         }
@@ -113,7 +110,7 @@ const server = net.createServer(function(socket) {
                         socket.username = d[1].trim();
                         serv_publisher.set(d[1].trim() , JSON.stringify ({"instance" : serv_channel , "name": socket.name}));
 						serv_publisher.expire (d[1].trim(), socket_timeout * 2);
-                        socket.write('Welcome ' + socket.username + "\n");     
+                        if (socket.writable) socket.write('Welcome ' + socket.username + "\n");     
                     }
                     break;
 
@@ -121,12 +118,12 @@ const server = net.createServer(function(socket) {
                     if (socket.username != null) {
                     	serv_publisher.del(socket.username);
                     	socket.username = null;
-                    	socket.write('Logout OK\n');
+                    	if (socket.writable) socket.write('Logout OK\n');
                     }
                     break;
 
                 case 'exit':
-                    socket.write('Good bye!\n');
+                    if (socket.writable) socket.write('Good bye!\n');
                     socket.end();
                     break;
 
@@ -140,12 +137,12 @@ const server = net.createServer(function(socket) {
 									userdata = JSON.parse(userdata);
         							msgto (msgdata , username, socket.username, userdata.instance);
         						} else {
-        							socket.write(username + ' - User not found\n');
+        							if (socket.writable) socket.write(username + ' - User not found\n');
         						}
         					}
    						 });
                     } else {
-                    	socket.write('bad syntax: msg <target_username> <text_message>\n');
+                    	if (socket.writable) socket.write('bad syntax: msg <target_username> <text_message>\n');
                     }
                     break;
 
@@ -156,7 +153,7 @@ const server = net.createServer(function(socket) {
                     break;
 
                 case 'whoami':
-                    socket.write(socket.username + "\n");
+                    if (socket.writable) socket.write(socket.username + "\n");
                     break;
 
                 case 'kill':
@@ -167,7 +164,7 @@ const server = net.createServer(function(socket) {
 								userdata = JSON.parse(userdata);
 								kill (username, userdata.instance);
 							} else {
-								socket.write(username + ' - User not found\n');
+								if (socket.writable) socket.write(username + ' - User not found\n');
 							}
 						}
 					 });
@@ -179,13 +176,14 @@ const server = net.createServer(function(socket) {
                     
                 case 'listinstances':
 					serv_publisher.keys(serv_pfx + '*', function (err, keys) {
-						if (err) return process.stdout.write(err);
-						socket.write(keys.join('\n') + '\n');
+						if (err) return console.log(err);
+						if (socket.writable) socket.write(keys.join('\n') + '\n');
+							
 					});
                     break;
 
                 default:
-                    process.stdout.write('data->' + data);
+                    console.log('data->' + data);
                     // ToDo. Put here your code
             }
         }
@@ -195,8 +193,7 @@ const server = net.createServer(function(socket) {
     socket.on('end', function() {
         if (socket.username != null) serv_publisher.del(socket.username);
         clients.splice(clients.indexOf(socket), 1);
-        console.log (socket.name + " left the server.\n");
-        //broadcast(socket.name + " left the server.\n");
+        console.log (socket.name + " left the server.");
     });
     
 	socket.write ("#\n");
@@ -207,20 +204,11 @@ const server = net.createServer(function(socket) {
    
    //  Add Data for the Discovery Process
    serv_channel = serv_pfx + server.address().port;
-   serv_subcriber.set(serv_channel , JSON.stringify(server.address()));
-   serv_subcriber.expire (serv_channel, serv_timeout);
+   serv_subscriber.set(serv_channel , JSON.stringify(server.address()));
+   serv_subscriber.expire (serv_channel, serv_timeout);
 
-   // Add KeepAlive 
-   setInterval(
-   		function(){
-			var serv_subcriber = redis.createClient(redis_port, redis_host);
-			serv_subcriber.set(serv_channel , JSON.stringify(server.address()));
-			serv_subcriber.expire (serv_channel, serv_timeout);
-   		}, (serv_timeout / 2) * 1000);
-
-
-   	serv_subcriber.subscribe(serv_channel); 
-   	serv_subcriber.on("message", function(channel, message) {
+   	serv_subscriber.subscribe(serv_channel); 
+   	serv_subscriber.on("message", function(channel, message) {
 		var d = csplit(message.toString('ascii'), ' ', 3);
 		if (d.length == 0) return;
 		switch (d[0].toLowerCase()) {
@@ -236,15 +224,23 @@ const server = net.createServer(function(socket) {
 				break;
 				
 			default:
-				process.stdout.write('serv_subcriber->' + message + "\n");
+				console.log('serv_subscriber->' + message + "\n");
 		}
     });
-	
+    
+   // Add KeepAlive 
+   setInterval(
+   		function(){
+			serv_publisher.set(serv_channel , JSON.stringify(server.address()));
+			serv_publisher.expire (serv_channel, serv_timeout);
+   		}, (serv_timeout / 2) * 1000);
 
 }).listen({
   host: 'localhost',
   port: freePort
 });
+
+
 
 
 });
@@ -253,14 +249,15 @@ const server = net.createServer(function(socket) {
     // Send to a specific username
     function msgto(message, to, from, instance) {
         if (instance!=serv_channel) {
-        	serv_subcriber = redis.createClient(redis_port, redis_host);
-        	serv_subcriber.publish(instance, 'msg ' + from + ' ' + to + ' ' + message);
+        	serv_subscriber = redis.createClient(redis_port, redis_host);
+        	serv_subscriber.publish(instance, 'msg ' + from + ' ' + to + ' ' + message);
         } else {
 			clients.forEach(function(client) {
 				// Don't want to send it to sender
 				if (client.username == to) {
+					var msg = "from " + instance + "." + from + ": " + message + "\n";
 					if (client.writable) {
-						client.write("from " + instance + "." + from + ": " + message + "\n");
+						client.write(msg);
 					}
 					return;	
 				}
@@ -271,8 +268,8 @@ const server = net.createServer(function(socket) {
     // kill all sockets for an username
     function kill(username, instance) {
         if (instance!=serv_channel) {
-        	serv_subcriber = redis.createClient(redis_port, redis_host);
-        	serv_subcriber.publish(instance, 'kill ' + username);
+        	serv_subscriber = redis.createClient(redis_port, redis_host);
+        	serv_subscriber.publish(instance, 'kill ' + username);
         } else {
 			clients.forEach(function(client) {
 				// Don't want to send it to sender

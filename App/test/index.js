@@ -4,8 +4,9 @@
 // sudo sysctl -w kern.maxfilesperproc=24576
 
 
-var net = require('net');
+var net     = require('net');
 var clients = [];
+var fs      = require('fs');
 
 function Dummy(i){
     this.socket = require('net').Socket();
@@ -16,16 +17,17 @@ function Dummy(i){
 
     
     this.socket.on('data', function (data) {
+    	
     	if (data.toString() == "#\n"){
     		this.write('login ' + this.user +'\n');
     		setTimeout((function () {
     			this.write('msg Claudio Hola\n');
-    			
-				//setTimeout((function () {
-					this.end();	
-				//}).bind(this), 5000);
     		}).bind(this), 2000);
-
+    	} else if (data.toString().substring(0, 7) == "Welcome") {
+    		setTimeout((function () {
+    			this.write('exit\n');
+    		}).bind(this), 2000);
+    		
     	} else {
     		console.log (data.toString());
     	}
@@ -33,8 +35,10 @@ function Dummy(i){
 
     this.socket.on('error', function(exception) {
 		console.log ("\n-- Error --------------------------------------\n");
-        console.log (exception);
         console.log (exception.stack);
+		fs.appendFile('error.log', "\n-- Error --------------------------------------\n" + exception.stack + "\n", function (err) {
+  			if (err) throw err;
+		});   
     });
 
 	this.socket.on('end', () => {
@@ -44,6 +48,6 @@ function Dummy(i){
     this.socket.connect(5000, '127.0.0.1');
 }
 
-for (var i = 0; i < 5000; i++) {
+for (var i = 0; i < 20000; i++) {
     clients.push(new Dummy(i));
 };
