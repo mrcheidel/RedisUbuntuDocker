@@ -1,8 +1,7 @@
 # https://github.com/mrcheidel/RedisUbuntuDocker
+FROM ubuntu:16.04
 
 LABEL maintainer="Claudio Heidel"
-
-FROM ubuntu:16.04
 
 RUN \
   sed -i 's/# \(.*multiverse$\)/\1/g' /etc/apt/sources.list && \
