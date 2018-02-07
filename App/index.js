@@ -4,6 +4,8 @@
 
 # http://www.toptip.ca/2010/02/linux-eaddrnotavail-address-not.html
 # https://blog.dekstroza.io/ulimit-shenanigans-on-osx-el-capitan/
+# http://blog.caustik.com/2012/08/19/node-js-w1m-concurrent-connections/
+# https://blog.jayway.com/2015/04/13/600k-concurrent-websocket-connections-on-aws-using-node-js/
 
      The net.inet.ip.portrange.* sysctls control the port number ranges	auto-
      matically bound to	TCP and	UDP sockets.  There are	three ranges: a	low
@@ -36,6 +38,7 @@
 
 
 
+
 */
 
 
@@ -57,6 +60,22 @@ var serv_subscriber = redis.createClient(redis_port, redis_host);
 var serv_publisher  = redis.createClient(redis_port, redis_host);
 const fs = require('fs');
 
+
+serv_subscriber.on("error", function (err) {
+    console.log("serv_subscriber " + err);
+	fs.appendFile('serv_subscriber.log', "\n-- Error ---\n" + e.stack || e + "\n", function (err) {
+		if (err) console.log (err.toString());
+	});   
+});
+
+serv_subscriber.on("error", function (err) {
+    console.log("serv_publisher " + err);
+	fs.appendFile('serv_publisher.log', "\n-- Error ---\n" + e.stack || e + "\n", function (err) {
+		if (err) console.log (err.toString());
+	});   
+});
+
+
 freeport(5000, 5100, function(err, freePort){
 
 //clear screen
@@ -67,6 +86,15 @@ const server = net.createServer(function(socket) {
 
     // Identify this client
     socket.name = socket.remoteAddress + ":" + socket.remotePort;
+    
+/* 
+	socket.sub  = redis.createClient(redis_port, redis_host);
+   	socket.sub.on("message", function(channel, message) {
+   		if (socket.writable) {
+   			socket.write('socket.sub-> channer:' + channel + ", message: " + message + "\n");
+   		}
+    });
+*/
     socket.username = null;
     
     // Put this new client in the list
@@ -82,10 +110,10 @@ const server = net.createServer(function(socket) {
 		}
 	});
 
-    socket.on('error', function(exception) {
+    socket.on('error', function(e) {
 		console.log ("\n-- Error --------------------------------------\n");
-		console.log (exception.stack);
-		fs.appendFile('error.log', "\n-- Error --------------------------------------\n" + exception.stack + "\n", function (err) {
+		console.log (e.stack || e);
+		fs.appendFile('error.log', "\n-- Error --------------------------------------\n" + e.stack || e + "\n", function (err) {
   			if (err) console.log (err.toString());
 		});     
     });
@@ -93,7 +121,8 @@ const server = net.createServer(function(socket) {
     // Remove the client from the list when it leaves
     socket.on('end', function() {
         if (socket.username != null) serv_publisher.del(socket.username);
-        clients.splice(clients.indexOf(socket), 1);
+        if (socket.sub) socket.sub.quit();
+        clients.splice(clients.indexOf(socket), 1); 
         console.log (socket.name + " left the server.");
     });
 
@@ -103,8 +132,48 @@ const server = net.createServer(function(socket) {
 
             var d = csplit(data.toString('ascii'), ' ', 2);
             if (d.length == 0) return;
-
             switch (d[0].toLowerCase()) {
+            	case 'sadd':
+                    if (d.length > 2) {
+                        var setsn = d[1].trim();
+                        var value = d[2].trim();
+            			serv_publisher.sadd(setsn, value, function(err, res) {
+                            if(err!==null) {
+                            	if (socket.writable) socket.write(err.toString() + "\n");
+                            } else {
+                            	if (socket.writable) socket.write(res.toString() + "\n");
+                            }
+                        });
+                    }
+                    break;
+                    
+            	case 'smembers':
+                    if (d.length > 2) {
+                        var setsn = d[1].trim();
+            			serv_publisher.smembers(setsn, function(err, res) {
+                            if(err!==null) {
+                            	if (socket.writable) socket.write(err.toString() + "\n");
+                            } else {
+                            	if (socket.writable) socket.write(res.toString() + "\n");
+                            }
+                        });
+                    }
+                    break;
+                    
+             	case 'srem':
+                    if (d.length > 2) {
+                        var setsn = d[1].trim();
+                        var value = d[2].trim();
+            			serv_publisher.srem(setsn, value, function(err, res) {
+                            if(err!==null) {
+                            	if (socket.writable) socket.write(err.toString() + "\n");
+                            } else {
+                            	if (socket.writable) socket.write(res.toString() + "\n");
+                            }
+                        });
+                    }
+                    break;
+ 
                 case 'publish':
                     if (d.length > 2) {
                         var channel = d[1].trim();
@@ -123,7 +192,7 @@ const server = net.createServer(function(socket) {
                     if (d.length > 1) {
                         if (socket.sub) {
                             var channel = d[1].trim();
-                            serv_subscriber.subscribe(channel, function(err, res) {
+                            socket.sub.subscribe(channel, function(err, res) {
 								if(err!==null) {
 									if (socket.writable) socket.write(err.toString() + "\n");
 								} else {
@@ -138,7 +207,7 @@ const server = net.createServer(function(socket) {
                     if (d.length > 1) {
                         if (socket.sub) {
                             var channel = d[1].trim();
-                            serv_subscriber.unsubscribe(channel, function(err, res) {
+                            socket.sub.unsubscribe(channel, function(err, res) {
 								if(err!==null) {
 									if (socket.writable) socket.write(err.toString() + "\n");
 								} else {
@@ -172,13 +241,13 @@ const server = net.createServer(function(socket) {
                 case 'logout':
                     if (socket.username != null) {
                     	serv_publisher.del(socket.username);
+                    	if (socket.writable) socket.write('Logout ' + socket.username + '\n');
                     	socket.username = null;
-                    	if (socket.writable) socket.write('Logout OK\n');
                     }
                     break;
 
                 case 'exit':
-                    if (socket.writable) socket.write('Good bye!\n');
+                    if (socket.writable) socket.write('Good bye ' + socket.name + '!\n');
                     socket.end();
                     break;
 
@@ -231,9 +300,14 @@ const server = net.createServer(function(socket) {
                     socket.write(userlist().join('\n') + '\n');
                     break;
                     
-                case 'conncount':
+                case 'ucount': //users count
                     socket.write(userlist().length + '\n');
                     break;
+                    
+                case 'ccount': //connections count
+                    socket.write(clients.length + '\n');
+                    break;
+                    
                     
                 case 'listinstances':
 					serv_publisher.keys(serv_pfx + '*', function (err, keys) {

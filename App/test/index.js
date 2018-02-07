@@ -10,6 +10,7 @@ var fs      = require('fs');
 
 function Dummy(i){
     this.socket = require('net').Socket();
+    this.socket.setTimeout(600 * 1000); //10 minutos
     this.socket.user = 'User' + i;
     this.socket.on('connect', function () {
 		console.log (this.user);
@@ -71,8 +72,9 @@ var myVar = setInterval(function () {
 
    sysctl net.inet.ip.portrange.first net.inet.ip.portrange.last
 
-# set the new values
-   sudo  sysctl net.inet.ip.portrange.first=35535  
+# set the new values to accept 50100 connections (65535 - 5100)
+
+   sudo  sysctl net.inet.ip.portrange.first=15000  
    
    
 // sudo launchctl limit maxfiles 1000000 200000
