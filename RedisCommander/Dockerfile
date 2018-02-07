@@ -1,7 +1,7 @@
-# Created by Claudio Heidel
 # https://github.com/mrcheidel/RedisUbuntuDocker
-
 FROM ubuntu:16.04
+
+LABEL maintainer="Claudio Heidel"
 
 RUN \
   sed -i 's/# \(.*multiverse$\)/\1/g' /etc/apt/sources.list && \
