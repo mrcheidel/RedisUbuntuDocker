@@ -52,7 +52,7 @@ function Dummy(i){
 
 var i = 0;
 var myVar = setInterval(function () {
-	if (i < 20000){
+	if (i < 50000){
 	 	clients.push(new Dummy(i));
 	 	i++;
 	} else {
@@ -60,11 +60,25 @@ var myVar = setInterval(function () {
 	}
 }, 4, i);
 
+/*
+
 
 // http://www.toptip.ca/2010/02/linux-eaddrnotavail-address-not.html
-// sysctl net.inet.ip.portrange.first net.inet.ip.portrange.last
-// sudo  sysctl net.inet.ip.portrange.first=35535
+// https://blog.dekstroza.io/ulimit-shenanigans-on-osx-el-capitan/
+// https://discuss.elastic.co/t/increasing-max-file-descriptors-osx/70482/4
+
+# Check the current values
+
+   sysctl net.inet.ip.portrange.first net.inet.ip.portrange.last
+
+# set the new values
+   sudo  sysctl net.inet.ip.portrange.first=35535  
    
+   
+// sudo launchctl limit maxfiles 1000000 200000
+
+*/ 
+
 /*
 
      The net.inet.ip.portrange.* sysctls control the port number ranges	auto-

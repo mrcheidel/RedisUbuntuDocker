@@ -1,14 +1,53 @@
 #!/usr/bin/env node
 
+/*
+
+# http://www.toptip.ca/2010/02/linux-eaddrnotavail-address-not.html
+# https://blog.dekstroza.io/ulimit-shenanigans-on-osx-el-capitan/
+
+     The net.inet.ip.portrange.* sysctls control the port number ranges	auto-
+     matically bound to	TCP and	UDP sockets.  There are	three ranges: a	low
+     range, a default range, and a high	range, selectable via the IP_PORTRANGE
+     setsockopt(2) call.  Most network programs	use the	default	range which is
+     controlled	by net.inet.ip.portrange.first and net.inet.ip.portrange.last,
+     which default to 49152 and	65535, respectively.  Bound port ranges	are
+     used for outgoing connections, and	it is possible to run the system out
+     of	ports under certain circumstances.  This most commonly occurs when you
+     are running a heavily loaded web proxy.  The port range is	not an issue
+     when running a server which handles mainly	incoming connections, such as
+     a normal web server, or has a limited number of outgoing connections,
+     such as a mail relay.  For	situations where you may run out of ports, we
+     recommend decreasing net.inet.ip.portrange.first modestly.	 A range of
+     10000 to 30000 ports may be reasonable.  You should also consider fire-
+     wall effects when changing	the port range.	 Some firewalls	may block
+     large ranges of ports (usually low-numbered ports)	and expect systems to
+     use higher	ranges of ports	for outgoing connections.  By default
+     net.inet.ip.portrange.last	is set at the maximum allowable	port number.
+
+# Check the current values
+
+   sysctl net.inet.ip.portrange.first net.inet.ip.portrange.last
+
+# set the new values to accept 50100 connections (65535 - 5100)
+
+   sudo  sysctl net.inet.ip.portrange.first=15435  
+   
+# sudo launchctl limit maxfiles 524288 524288
+
+
+
+*/
+
+
+
 // Load the TCP Library
 net      = require('net');
 redis    = require("redis");
 freeport = require("find-free-port");
 
-
 // Keep track of the clients
 var clients         = [];
-var redis_host      = 'localhost';
+var redis_host      = '127.0.0.1';
 var redis_port      = 6379;
 var serv_pfx        = 'microserv_socket_';
 var serv_timeout    = 10; //seconds
@@ -17,8 +56,6 @@ var socket_timeout  = 10; //seconds
 var serv_subscriber = redis.createClient(redis_port, redis_host);
 var serv_publisher  = redis.createClient(redis_port, redis_host);
 const fs = require('fs');
-
-
 
 freeport(5000, 5100, function(err, freePort){
 
@@ -35,6 +72,8 @@ const server = net.createServer(function(socket) {
     // Put this new client in the list
     clients.push(socket);
 	socket.setTimeout(socket_timeout * 1000);
+	
+    socket.write ("#\n");
 
 	socket.on('timeout', () => {
 		if (socket.username!== null) {
@@ -49,6 +88,13 @@ const server = net.createServer(function(socket) {
 		fs.appendFile('error.log', "\n-- Error --------------------------------------\n" + exception.stack + "\n", function (err) {
   			if (err) console.log (err.toString());
 		});     
+    });
+    
+    // Remove the client from the list when it leaves
+    socket.on('end', function() {
+        if (socket.username != null) serv_publisher.del(socket.username);
+        clients.splice(clients.indexOf(socket), 1);
+        console.log (socket.name + " left the server.");
     });
 
     // Handle incoming messages from clients.
@@ -204,14 +250,7 @@ const server = net.createServer(function(socket) {
         }
     });
 
-    // Remove the client from the list when it leaves
-    socket.on('end', function() {
-        if (socket.username != null) serv_publisher.del(socket.username);
-        clients.splice(clients.indexOf(socket), 1);
-        console.log (socket.name + " left the server.");
-    });
 
-    socket.write ("#\n");
 
 }).on('listening', () => {
   // handle errors here
@@ -251,7 +290,7 @@ const server = net.createServer(function(socket) {
    		}, (serv_timeout / 2) * 1000);
 
 }).listen({
-  host: 'localhost',
+  host: '127.0.0.1',
   port: freePort
 });
 
@@ -279,51 +318,51 @@ const server = net.createServer(function(socket) {
         }
     }
     
-    // kill all sockets for an username
-    function kill(username, instance) {
-        if (instance!=serv_channel) {
-        	serv_publisher.publish(instance, 'kill ' + username);
-        } else {
+	// kill all sockets for an username
+	function kill(username, instance) {
+		if (instance!=serv_channel) {
+			serv_publisher.publish(instance, 'kill ' + username);
+		} else {
 			clients.forEach(function(client) {
 				// Don't want to send it to sender
 				if (client.username == username) {
 					client.end();
 				}
 			});
- 		}
-    }
+		}
+	}
     
-    function csplit(data, delimiter, counter) {
-        var d = data.split(delimiter);
-        var r = [];
+	function csplit(data, delimiter, counter) {
+		var d = data.split(delimiter);
+		var r = [];
 
-        for (var i = 0; i < d.length; i++) {
-            if (d[i].trim() !== '') r.push(d[i].trim());
-            if (r.length == counter) {
-                r.push(d.slice(i + 1).join(delimiter));
-                break;
-            }
-        }
-        return r;
-    }
+		for (var i = 0; i < d.length; i++) {
+			if (d[i].trim() !== '') r.push(d[i].trim());
+			if (r.length == counter) {
+				r.push(d.slice(i + 1).join(delimiter));
+				break;
+			}
+		}
+		return r;
+	}
 
-    // Send to a specific username
-    function userlist() {
-        var res = [];
-        clients.forEach(function(client) {
-            if (client.username) res.push(client.username);
-        });
-        return res;
-    }
+	// Send to a specific username
+	function userlist() {
+		var res = [];
+		clients.forEach(function(client) {
+			if (client.username) res.push(client.username);
+		});
+		return res;
+	}
 
-    // Send a message to all clients
-    function broadcast(message, sender) {
-        clients.forEach(function(client) {
-            // Don't want to send it to sender
-            if (client === sender) return;
-            if (client.writable) client.write(message);
-        });
-    }
+	// Send a message to all clients
+	function broadcast(message, sender) {
+		clients.forEach(function(client) {
+			// Don't want to send it to sender
+			if (client === sender) return;
+			if (client.writable) client.write(message);
+		});
+	}
 
 	function getPort (cb) {
 		var port = socket_port
