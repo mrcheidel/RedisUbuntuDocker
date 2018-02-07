@@ -31,6 +31,7 @@ const server = net.createServer(function(socket) {
     // Identify this client
     socket.name = socket.remoteAddress + ":" + socket.remotePort;
     socket.username = null;
+    
     // Put this new client in the list
     clients.push(socket);
 	socket.setTimeout(socket_timeout * 1000);
@@ -38,6 +39,7 @@ const server = net.createServer(function(socket) {
 	socket.on('timeout', () => {
 		if (socket.username!== null) {
 			serv_publisher.expire (socket.username, socket_timeout * 2);
+			socket.setTimeout(socket_timeout * 1000);
 		}
 	});
 
@@ -45,8 +47,8 @@ const server = net.createServer(function(socket) {
 		console.log ("\n-- Error --------------------------------------\n");
 		console.log (exception.stack);
 		fs.appendFile('error.log', "\n-- Error --------------------------------------\n" + exception.stack + "\n", function (err) {
-  			if (err) throw err;
-		});  
+  			if (err) console.log (err.toString());
+		});     
     });
 
     // Handle incoming messages from clients.
@@ -110,7 +112,14 @@ const server = net.createServer(function(socket) {
                         socket.username = d[1].trim();
                         serv_publisher.set(d[1].trim() , JSON.stringify ({"instance" : serv_channel , "name": socket.name}));
 						serv_publisher.expire (d[1].trim(), socket_timeout * 2);
-                        if (socket.writable) socket.write('Welcome ' + socket.username + "\n");     
+                        if (socket.writable) socket.write('Welcome ' + socket.username + "\n");  
+                        
+                        /*
+						fs.appendFile('login.log', 'Welcome ' + socket.username + '\n' , function (err) {
+							if (err) throw err;
+						});  
+						*/
+     
                     }
                     break;
 
@@ -139,6 +148,8 @@ const server = net.createServer(function(socket) {
         						} else {
         							if (socket.writable) socket.write(username + ' - User not found\n');
         						}
+        					} else {
+        						console.log ("msg error " + err.toString());
         					}
    						 });
                     } else {
@@ -174,6 +185,10 @@ const server = net.createServer(function(socket) {
                     socket.write(userlist().join('\n') + '\n');
                     break;
                     
+                case 'conncount':
+                    socket.write(userlist().length + '\n');
+                    break;
+                    
                 case 'listinstances':
 					serv_publisher.keys(serv_pfx + '*', function (err, keys) {
 						if (err) return console.log(err);
@@ -195,8 +210,8 @@ const server = net.createServer(function(socket) {
         clients.splice(clients.indexOf(socket), 1);
         console.log (socket.name + " left the server.");
     });
-    
-	socket.write ("#\n");
+
+    socket.write ("#\n");
 
 }).on('listening', () => {
   // handle errors here
@@ -249,8 +264,7 @@ const server = net.createServer(function(socket) {
     // Send to a specific username
     function msgto(message, to, from, instance) {
         if (instance!=serv_channel) {
-        	serv_subscriber = redis.createClient(redis_port, redis_host);
-        	serv_subscriber.publish(instance, 'msg ' + from + ' ' + to + ' ' + message);
+        	serv_publisher.publish(instance, 'msg ' + from + ' ' + to + ' ' + message);
         } else {
 			clients.forEach(function(client) {
 				// Don't want to send it to sender
@@ -268,8 +282,7 @@ const server = net.createServer(function(socket) {
     // kill all sockets for an username
     function kill(username, instance) {
         if (instance!=serv_channel) {
-        	serv_subscriber = redis.createClient(redis_port, redis_host);
-        	serv_subscriber.publish(instance, 'kill ' + username);
+        	serv_publisher.publish(instance, 'kill ' + username);
         } else {
 			clients.forEach(function(client) {
 				// Don't want to send it to sender
