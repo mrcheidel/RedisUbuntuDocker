@@ -132,53 +132,74 @@ const server = net.createServer(function(socket) {
 
             var d = csplit(data.toString('ascii'), ' ', 2);
             if (d.length == 0) return;
-            switch (d[0].toLowerCase()) {
-            	case 'sadd':
-                    if (d.length > 2) {
-                        var setsn = d[1].trim();
-                        var value = d[2].trim();
-            			serv_publisher.sadd(setsn, value, function(err, res) {
-                            if(err!==null) {
-                            	if (socket.writable) socket.write(err.toString() + "\n");
-                            } else {
-                            	if (socket.writable) socket.write(res.toString() + "\n");
-                            }
-                        });
-                    }
-                    break;
-                    
-            	case 'smembers':
-                    if (d.length > 2) {
-                        var setsn = d[1].trim();
-            			serv_publisher.smembers(setsn, function(err, res) {
-                            if(err!==null) {
-                            	if (socket.writable) socket.write(err.toString() + "\n");
-                            } else {
-                            	if (socket.writable) socket.write(res.toString() + "\n");
-                            }
-                        });
-                    }
-                    break;
-                    
-             	case 'srem':
-                    if (d.length > 2) {
-                        var setsn = d[1].trim();
-                        var value = d[2].trim();
-            			serv_publisher.srem(setsn, value, function(err, res) {
-                            if(err!==null) {
-                            	if (socket.writable) socket.write(err.toString() + "\n");
-                            } else {
-                            	if (socket.writable) socket.write(res.toString() + "\n");
-                            }
-                        });
-                    }
-                    break;
- 
-                case 'publish':
+            switch (d[0].toLowerCase()) {     
+                case 'pub':
                     if (d.length > 2) {
                         var channel = d[1].trim();
-                        var msg = d[2];
-                        serv_publisher.publish(channel, msg, function(err, res) {
+                        var msgdata = d[2];
+                        if (socket.username != null) {
+							serv_publisher.smembers(channel, function(err, res) {
+								if(err!==null) {
+									if (socket.writable) socket.write(err.toString() + "\n");
+								} else {
+									res.forEach(function(username) {
+										serv_publisher.get (username, function(err, userdata) {
+											if(!err) {
+												if (userdata!=null) {
+													userdata = JSON.parse(userdata);
+													msgto (msgdata , username, socket.username, userdata.instance);
+												} 
+											}
+										 });
+									});
+								
+									if (socket.writable) socket.write(res.length + "\n");
+								}
+							}); 
+                        } else {
+                        	if (socket.writable) socket.write("You must be login first\n");
+                        }
+                    }
+                    break;
+                    
+            	case 'sub':
+                    if (d.length > 1) {
+                        var channel  = d[1].trim();
+                        if (socket.username != null) {
+							serv_publisher.sadd(channel, socket.username, function(err, res) {
+								if(err!==null) {
+									if (socket.writable) socket.write(err.toString() + "\n");
+								} else {
+									if (socket.writable) socket.write(res.toString() + "\n");
+								}
+							});
+                        } else {
+                        	if (socket.writable) socket.write("You must be login first\n");
+                        }
+                    }
+                    break;
+                    
+             	case 'usub':
+                    if (d.length > 1) {
+                        var channel  = d[1].trim();
+                        if (socket.username != null) {
+							serv_publisher.srem(channel, socket.username, function(err, res) {
+								if(err!==null) {
+									if (socket.writable) socket.write(err.toString() + "\n");
+								} else {
+									if (socket.writable) socket.write(res.toString() + "\n");
+								}
+							});
+                        } else {
+                        	if (socket.writable) socket.write("You must be login first\n");
+                        }
+                    }
+                    break;
+                    
+            	case 'mem':
+                    if (d.length > 2) {
+                        var channel = d[1].trim();
+            			serv_publisher.smembers(channel, function(err, res) {
                             if(err!==null) {
                             	if (socket.writable) socket.write(err.toString() + "\n");
                             } else {
@@ -188,37 +209,7 @@ const server = net.createServer(function(socket) {
                     }
                     break;
 
-                case 'subscribe':
-                    if (d.length > 1) {
-                        if (socket.sub) {
-                            var channel = d[1].trim();
-                            socket.sub.subscribe(channel, function(err, res) {
-								if(err!==null) {
-									if (socket.writable) socket.write(err.toString() + "\n");
-								} else {
-									if (socket.writable) socket.write(res.toString() + "\n");
-								}
-							});
-                        }
-                    }
-                    break;
-
-                case 'unsubscribe':
-                    if (d.length > 1) {
-                        if (socket.sub) {
-                            var channel = d[1].trim();
-                            socket.sub.unsubscribe(channel, function(err, res) {
-								if(err!==null) {
-									if (socket.writable) socket.write(err.toString() + "\n");
-								} else {
-									if (socket.writable) socket.write(res.toString() + "\n");
-								}
-							});
-                        }
-                    }
-                    break;
-
-                case 'login':
+                case 'lgn':
                     if (d.length > 1) {
                     	if (socket.username != null) {
                     		serv_publisher.del(socket.username);
@@ -238,7 +229,7 @@ const server = net.createServer(function(socket) {
                     }
                     break;
 
-                case 'logout':
+                case 'out':
                     if (socket.username != null) {
                     	serv_publisher.del(socket.username);
                     	if (socket.writable) socket.write('Logout ' + socket.username + '\n');
@@ -255,24 +246,28 @@ const server = net.createServer(function(socket) {
                     if (d.length == 3) {
 						var username = d[1].trim();
 						var msgdata  = d[2];
-						serv_publisher.get (username, function(err, userdata) {
-							if(!err) {
-								if (userdata!=null) {
-									userdata = JSON.parse(userdata);
-        							msgto (msgdata , username, socket.username, userdata.instance);
-        						} else {
-        							if (socket.writable) socket.write(username + ' - User not found\n');
-        						}
-        					} else {
-        						console.log ("msg error " + err.toString());
-        					}
-   						 });
+                        if (socket.username != null) {
+							serv_publisher.get (username, function(err, userdata) {
+								if(!err) {
+									if (userdata!=null) {
+										userdata = JSON.parse(userdata);
+										msgto (msgdata , username, socket.username, userdata.instance);
+									} else {
+										if (socket.writable) socket.write(username + ' - User not found\n');
+									}
+								} else {
+									console.log ("msg error " + err.toString());
+								}
+							});
+                        } else {
+                        	if (socket.writable) socket.write("You must be login first\n");
+                        }
                     } else {
                     	if (socket.writable) socket.write('bad syntax: msg <target_username> <text_message>\n');
                     }
                     break;
 
-                case 'broadcast':
+                case 'bcst': //broadcast
                     d = csplit(data.toString('ascii'), ' ', 1);
                     var msgdata = d[1];
                     broadcast(msgdata + "\n", socket);
@@ -296,7 +291,7 @@ const server = net.createServer(function(socket) {
 					 });
                     break;
 
-                case 'whoishere':
+                case 'whois':
                     socket.write(userlist().join('\n') + '\n');
                     break;
                     
@@ -309,7 +304,7 @@ const server = net.createServer(function(socket) {
                     break;
                     
                     
-                case 'listinstances':
+                case 'linst': // list intances
 					serv_publisher.keys(serv_pfx + '*', function (err, keys) {
 						if (err) return console.log(err);
 						if (socket.writable) socket.write(keys.join('\n') + '\n');
@@ -376,6 +371,8 @@ const server = net.createServer(function(socket) {
 
     // Send to a specific username
     function msgto(message, to, from, instance) {
+    
+
         if (instance!=serv_channel) {
         	serv_publisher.publish(instance, 'msg ' + from + ' ' + to + ' ' + message);
         } else {
