@@ -135,18 +135,32 @@ const server = net.createServer(function(socket) {
 								if(err!==null) {
 									if (socket.writable) socket.write(err.toString() + "\n");
 								} else {
-									res.forEach(function(username) {
-										serv_publisher.get (username, function(err, userdata) {
-											if(!err) {
-												if (userdata!=null) {
-													userdata = JSON.parse(userdata);
-													msgto (msgdata , username, socket.username, userdata.instance);
-												} 
-											}
-										 });
-									});
 								
-									if (socket.writable) socket.write(res.length + "\n");
+									var pr = res.map (
+										function(username) {
+											return  new Promise(function(resolve, reject){
+												serv_publisher.get (username, function(err, userdata) {
+													if(!err) {
+														if (userdata!=null) {
+															userdata = JSON.parse(userdata);
+															msgto (msgdata , username, socket.username, userdata.instance);
+															resolve (1);
+														} else {
+															resolve (0);
+														}
+													} else {
+														reject(0);
+													}
+												})
+											});
+										}
+									);
+
+									Promise.all(pr).then(values => {
+										var qty = values.reduce(function(a, b) { return a + b; }, 0);
+										if (socket.writable) socket.write(qty + "\n");
+									});
+
 								}
 							}); 
                         } else {
