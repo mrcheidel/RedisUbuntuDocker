@@ -19,7 +19,7 @@ function Dummy(i){
     
     this.socket.on('data', function (data) {
     	if (data.toString().substring(0, 1) == "#"){
-    		this.write('login ' + this.user + '\n');
+    		this.write('lgn ' + this.user + '\n');
     	} else if (data.toString().substring(0, 7) == "Welcome") {
    			setTimeout((function () {
     			this.write('msg ' + this.user +' Hola\n');
@@ -53,7 +53,7 @@ function Dummy(i){
 
 var i = 0;
 var myVar = setInterval(function () {
-	if (i < 50000){
+	if (i < 20000){
 	 	clients.push(new Dummy(i));
 	 	i++;
 	} else {

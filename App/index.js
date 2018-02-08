@@ -112,7 +112,8 @@ const server = net.createServer(function(socket) {
 		console.log (msg);
 		fs.appendFile('logs/socket_error.log', msg , function (err) {
   			if (err) console.log (err.toString());
-		});     
+		});  
+		kill(socket.username, serv_channel);   
     });
     
     // Remove the client from the list when it leaves
@@ -210,14 +211,16 @@ const server = net.createServer(function(socket) {
             	case 'mem':
                     if (d.length > 1) {
                         var channel = d[1].trim();
-            			serv_publisher.smembers(channel, function(err, res) {
-                            if(err!==null) {
-                            	if (socket.writable) socket.write(err.toString() + "\n");
-                            } else {
-                            	if (socket.writable) socket.write(res.toString() + "\n");
-                            }
-                        });
-                    }
+						serv_publisher.smembers(channel, function(err, res) {
+							if(err!==null) {
+								if (socket.writable) socket.write(err.toString() + "\n");
+							} else {
+								if (socket.writable) socket.write(res.toString() + "\n");
+							}
+						});
+                    } else {
+                        if (socket.writable) socket.write("Use: <mem> [channel]\n");
+                    } 
                     break;
 
                 case 'lgn':
@@ -316,6 +319,11 @@ const server = net.createServer(function(socket) {
 					});
                     break;
                     
+                case 'hlth':
+                	var msg = 'This Server uses approximately :' + (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2) + ' MB\n';
+                	if (socket.writable) socket.write(msg); 
+                	break;
+
                 case 'help': //connections count
                 	var msg = 'List available commands:\n';
                 	msg+= '  - <help> Show this message\n';
@@ -334,6 +342,7 @@ const server = net.createServer(function(socket) {
 					msg+= '  - <sub> [channel] Subscribe the current username to on an channel\n';
                 	msg+= '  - <pub> [channel] [message] Publish a message on an channel\n';
                 	msg+= '  - <usub> [channel] Unsubscribe the current username to on an channel\n';
+                	msg+= '  - <hlth> Show the memory used by the serverl\n';
                     if (socket.writable) socket.write(msg);
                     break;
 
