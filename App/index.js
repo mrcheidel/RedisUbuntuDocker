@@ -37,50 +37,54 @@
 # sudo launchctl limit maxfiles 524288 524288
 
 
-
-
 */
 
-
-
 // Load the TCP Library
-net      = require('net');
-redis    = require("redis");
-freeport = require("find-free-port");
+const net      = require('net');
+const redis    = require("redis");
+const freeport = require("find-free-port");
+const fs       = require('fs');
 
 // Keep track of the clients
 var clients         = [];
-var redis_host      = '127.0.0.1';
-var redis_port      = 6379;
-var serv_pfx        = 'microserv_socket_';
-var serv_timeout    = 10; //seconds
 var serv_channel;
-var serv_host       = '127.0.0.1';
-var socket_timeout  = 10; //seconds
-var serv_subscriber = redis.createClient(redis_port, redis_host);
-var serv_publisher  = redis.createClient(redis_port, redis_host);
-const fs = require('fs');
+
+var config = {
+	"redis_host": "127.0.0.1",
+	"redis_port": 6379,
+	"serv_pfx"  : "microserv_socket_",
+	"serv_timeout"  : 10,
+	"serv_host" : "127.0.0.1",
+	"serv_port_start": 5000,
+	"serv_port_end": 5100,
+	"socket_timeout": 10
+};
 
 
-serv_subscriber.on("error", function (err) {
-    console.log("serv_subscriber " + err);
-	fs.appendFile('serv_subscriber.log', "\n-- Error ---\n" + e.stack || e + "\n", function (err) {
+
+var serv_subscriber = redis.createClient(config.redis_port, config.redis_host);
+var serv_publisher  = redis.createClient(config.redis_port, config.redis_host);
+
+serv_subscriber.on("error", function (e) {
+	var msg = "\n" + new Date().toJSON() +  "\n-- Redis Subscriber Error --\n" + e.stack || e + "\n";
+    console.log(msg);
+	fs.appendFile('logs/redis_subscriber_error.log', msg , function (err) {
+		if (err) console.log (err.toString());
+	});     
+});
+
+serv_publisher.on("error", function (e) {
+	var msg = "\n" + new Date().toJSON() +  "\n-- Redis Publisher Error --\n" + e.stack || e + "\n";
+    console.log(msg);
+	fs.appendFile('logs/redis_publisher_error.log', msg , function (err) {
 		if (err) console.log (err.toString());
 	});   
 });
 
-serv_subscriber.on("error", function (err) {
-    console.log("serv_publisher " + err);
-	fs.appendFile('serv_publisher.log', "\n-- Error ---\n" + e.stack || e + "\n", function (err) {
-		if (err) console.log (err.toString());
-	});   
-});
+console.clear();
+console.log (new Date().toJSON());
 
-
-freeport(5000, 5100, serv_host , function(err, serv_freeport){
-
-//clear screen
-console.log('\033[2J');
+freeport(config.serv_port_start, config.serv_port_end, config.serv_host , function(err, serv_freeport){
 
 // Start a TCP Server
 const server = net.createServer(function(socket) {
@@ -92,21 +96,21 @@ const server = net.createServer(function(socket) {
     
     // Put this new client in the list
     clients.push(socket);
-	socket.setTimeout(socket_timeout * 1000);
+	socket.setTimeout(config.socket_timeout * 1000);
 	
     socket.write ("#\n");
 
 	socket.on('timeout', () => {
 		if (socket.username!== null) {
-			serv_publisher.expire (socket.username, socket_timeout * 2);
-			socket.setTimeout(socket_timeout * 1000);
+			serv_publisher.expire (socket.username, config.socket_timeout * 2);
+			socket.setTimeout(config.socket_timeout * 1000);
 		}
 	});
 
     socket.on('error', function(e) {
-		console.log ("\n-- Error --------------------------------------\n");
-		console.log (e.stack || e);
-		fs.appendFile('error.log', "\n-- Error --------------------------------------\n" + e.stack || e + "\n", function (err) {
+        var msg = "\n" + new Date().toJSON() +  "\n-- Socket Error --\n" + e.stack || e + "\n";
+		console.log (msg);
+		fs.appendFile('logs/socket_error.log', msg , function (err) {
   			if (err) console.log (err.toString());
 		});     
     });
@@ -224,15 +228,8 @@ const server = net.createServer(function(socket) {
                     	}
                         socket.username = d[1].trim();
                         serv_publisher.set(d[1].trim() , JSON.stringify ({"instance" : serv_channel , "name": socket.name}));
-						serv_publisher.expire (d[1].trim(), socket_timeout * 2);
+						serv_publisher.expire (d[1].trim(), config.socket_timeout * 2);
                         if (socket.writable) socket.write('Welcome ' + socket.username + "\n");  
-                        
-                        /*
-						fs.appendFile('login.log', 'Welcome ' + socket.username + '\n' , function (err) {
-							if (err) throw err;
-						});  
-						*/
-     
                     }
                     break;
 
@@ -277,7 +274,8 @@ const server = net.createServer(function(socket) {
                 case 'bcst': //broadcast
                     d = csplit(data.toString('ascii'), ' ', 1);
                     var msgdata = d[1];
-                    broadcast(msgdata + "\n", socket);
+                    var result = broadcast(msgdata + "\n", socket);
+                    if (socket.writable) socket.write(result + "\n");
                     break;
 
                 case 'whoami':
@@ -310,9 +308,8 @@ const server = net.createServer(function(socket) {
                     if (socket.writable) socket.write(clients.length + '\n');
                     break;
 
-                    
                 case 'linst': // list intances
-					serv_publisher.keys(serv_pfx + '*', function (err, keys) {
+					serv_publisher.keys(config.serv_pfx + '*', function (err, keys) {
 						if (err) return console.log(err);
 						if (socket.writable) socket.write(keys.join('\n') + '\n');
 							
@@ -344,11 +341,9 @@ const server = net.createServer(function(socket) {
                 	var msg = 'bad command [' + data.toString().trim() + ']: Use "help" to list all available commands\n';
                 	if (socket.writable) socket.write(msg);
                     console.log(msg);
-
             }
         }
     });
-
 
 
 }).on('listening', () => {
@@ -356,9 +351,9 @@ const server = net.createServer(function(socket) {
    console.log('Socker server running at port', server.address().port);
    
    //  Add Data for the Discovery Process
-   serv_channel = serv_pfx + server.address().port;
+   serv_channel = config.serv_pfx + server.address().port;
    serv_subscriber.set(serv_channel , JSON.stringify(server.address()));
-   serv_subscriber.expire (serv_channel, serv_timeout);
+   serv_subscriber.expire (serv_channel, config.serv_timeout);
 
    	serv_subscriber.subscribe(serv_channel); 
    	serv_subscriber.on("message", function(channel, message) {
@@ -385,11 +380,11 @@ const server = net.createServer(function(socket) {
    setInterval(
    		function(){
 			serv_publisher.set(serv_channel , JSON.stringify(server.address()));
-			serv_publisher.expire (serv_channel, serv_timeout);
-   		}, (serv_timeout / 2) * 1000);
+			serv_publisher.expire (serv_channel, config.serv_timeout);
+   		}, (config.serv_timeout / 2) * 1000);
 
 }).listen({
-  host: serv_host,
+  host: config.serv_host,
   port: serv_freeport
 });
 
@@ -401,8 +396,6 @@ const server = net.createServer(function(socket) {
 
     // Send to a specific username
     function msgto(message, to, from, instance) {
-    
-
         if (instance!=serv_channel) {
         	serv_publisher.publish(instance, 'msg ' + from + ' ' + to + ' ' + message);
         } else {
@@ -458,27 +451,13 @@ const server = net.createServer(function(socket) {
 
 	// Send a message to all clients
 	function broadcast(message, sender) {
+		var result=0;
 		clients.forEach(function(client) {
 			// Don't want to send it to sender
-			if (client === sender) return;
-			if (client.writable) client.write(message);
+			if (client !== sender){
+				if (client.writable) client.write(message);
+				result++;
+			}
 		});
+		return result;
 	}
-
-	function getPort (cb) {
-		var port = socket_port
-		socket_port += 1
-
-		var server = net.createServer()
-			server.listen(port, function (err) {
-			server.once('close', function () {
-			cb(port)
-		})
-		server.close()
-		})
-		server.on('error', function (err) {
-			getPort(cb)
-		})
-	}
-    
-    
