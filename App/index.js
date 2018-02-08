@@ -55,6 +55,7 @@ var redis_port      = 6379;
 var serv_pfx        = 'microserv_socket_';
 var serv_timeout    = 10; //seconds
 var serv_channel;
+var serv_host       = '127.0.0.1';
 var socket_timeout  = 10; //seconds
 var serv_subscriber = redis.createClient(redis_port, redis_host);
 var serv_publisher  = redis.createClient(redis_port, redis_host);
@@ -76,7 +77,7 @@ serv_subscriber.on("error", function (err) {
 });
 
 
-freeport(5000, 5100, '127.0.0.1', function(err, freePort){
+freeport(5000, 5100, serv_host , function(err, serv_freeport){
 
 //clear screen
 console.log('\033[2J');
@@ -87,14 +88,6 @@ const server = net.createServer(function(socket) {
     // Identify this client
     socket.name = socket.remoteAddress + ":" + socket.remotePort;
     
-/* 
-	socket.sub  = redis.createClient(redis_port, redis_host);
-   	socket.sub.on("message", function(channel, message) {
-   		if (socket.writable) {
-   			socket.write('socket.sub-> channer:' + channel + ", message: " + message + "\n");
-   		}
-    });
-*/
     socket.username = null;
     
     // Put this new client in the list
@@ -382,8 +375,8 @@ const server = net.createServer(function(socket) {
    		}, (serv_timeout / 2) * 1000);
 
 }).listen({
-  host: '127.0.0.1',
-  port: freePort
+  host: serv_host,
+  port: serv_freeport
 });
 
 
