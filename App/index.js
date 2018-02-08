@@ -197,7 +197,7 @@ const server = net.createServer(function(socket) {
                     break;
                     
             	case 'mem':
-                    if (d.length > 2) {
+                    if (d.length > 1) {
                         var channel = d[1].trim();
             			serv_publisher.smembers(channel, function(err, res) {
                             if(err!==null) {
@@ -292,17 +292,17 @@ const server = net.createServer(function(socket) {
                     break;
 
                 case 'whois':
-                    socket.write(userlist().join('\n') + '\n');
+                    if (socket.writable) socket.write(userlist().join('\n') + '\n');
                     break;
                     
                 case 'ucount': //users count
-                    socket.write(userlist().length + '\n');
+                    if (socket.writable) socket.write(userlist().length + '\n');
                     break;
                     
                 case 'ccount': //connections count
-                    socket.write(clients.length + '\n');
+                    if (socket.writable) socket.write(clients.length + '\n');
                     break;
-                    
+
                     
                 case 'linst': // list intances
 					serv_publisher.keys(serv_pfx + '*', function (err, keys) {
@@ -311,10 +311,33 @@ const server = net.createServer(function(socket) {
 							
 					});
                     break;
+                    
+                case 'help': //connections count
+                	var msg = 'List available commands:\n';
+                	msg+= '  - <help> Show this message\n';
+                	msg+= '  - <linst> List Socket Servers Instances\n';
+                	msg+= '  - <ccount> Current connections count on the this server\n';
+                	msg+= '  - <ucount> Current users count on the this server\n';
+                	msg+= '  - <whois> Current users logged list on the this server\n';
+                	msg+= '  - <kill> [username] Kill the active connection an logged username\n';
+                	msg+= '  - <whoami> Show the logged username\n';
+                	msg+= '  - <bcst> [message] Broadcast a message on this server\n';
+                	msg+= '  - <msg> [username] [message] Send a message to an username\n';
+                	msg+= '  - <lgn> [username] Login as username\n';
+                	msg+= '  - <out> Logout\n';
+                	msg+= '  - <exit> Logout and leave the current connection\n';
+					msg+= '  - <mem> [channel] List all the users on an channel\n';
+					msg+= '  - <sub> [channel] Subscribe the current username to on an channel\n';
+                	msg+= '  - <pub> [channel] [message] Publish a message on an channel\n';
+                	msg+= '  - <usub> [channel] Unsubscribe the current username to on an channel\n';
+                    if (socket.writable) socket.write(msg);
+                    break;
 
                 default:
-                    console.log('data->' + data);
-                    // ToDo. Put here your code
+                	var msg = 'bad command [' + data.toString().trim() + ']: Use "help" to list all available commands\n';
+                	if (socket.writable) socket.write(msg);
+                    console.log(msg);
+
             }
         }
     });
