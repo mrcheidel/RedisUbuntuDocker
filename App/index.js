@@ -57,7 +57,8 @@ var config = {
 	"serv_host" : "127.0.0.1",
 	"serv_port_start": 5000,
 	"serv_port_end": 5100,
-	"socket_timeout": 10
+	"socket_timeout": 10,
+	"debug_mode" : true
 };
 
 
@@ -67,17 +68,17 @@ var serv_publisher  = redis.createClient(config.redis_port, config.redis_host);
 
 serv_subscriber.on("error", function (e) {
 	var msg = "\n" + new Date().toJSON() +  "\n-- Redis Subscriber Error --\n" + e.stack || e + "\n";
-    console.log(msg);
+    if (config.debug_mode) console.log(msg);
 	fs.appendFile('logs/redis_subscriber_error.log', msg , function (err) {
-		if (err) console.log (err.toString());
+		if (err && config.debug_mode) console.log (err.toString());
 	});     
 });
 
 serv_publisher.on("error", function (e) {
 	var msg = "\n" + new Date().toJSON() +  "\n-- Redis Publisher Error --\n" + e.stack || e + "\n";
-    console.log(msg);
+    if (config.debug_mode) console.log(msg);
 	fs.appendFile('logs/redis_publisher_error.log', msg , function (err) {
-		if (err) console.log (err.toString());
+		if (err && config.debug_mode) console.log (err.toString());
 	});   
 });
 
@@ -109,9 +110,8 @@ const server = net.createServer(function(socket) {
 
     socket.on('error', function(e) {
         var msg = "\n" + new Date().toJSON() +  "\n-- Socket Error --\n" + e.stack || e + "\n";
-		console.log (msg);
 		fs.appendFile('logs/socket_error.log', msg , function (err) {
-  			if (err) console.log (err.toString());
+  			if (err && config.debug_mode) console.log (err.toString());
 		});  
 		kill(socket.username, serv_channel);   
     });
@@ -119,9 +119,8 @@ const server = net.createServer(function(socket) {
     // Remove the client from the list when it leaves
     socket.on('end', function() {
         if (socket.username != null) serv_publisher.del(socket.username);
-        if (socket.sub) socket.sub.quit();
         clients.splice(clients.indexOf(socket), 1); 
-        console.log (socket.name + " left the server.");
+        if (config.debug_mode) console.log (socket.name + " left the server.");
     });
 
     // Handle incoming messages from clients.
@@ -263,7 +262,7 @@ const server = net.createServer(function(socket) {
 										if (socket.writable) socket.write(username + ' - User not found\n');
 									}
 								} else {
-									console.log ("msg error " + err.toString());
+									if (config.debug_mode) console.log ("msg error " + err.toString());
 								}
 							});
                         } else {
@@ -313,7 +312,7 @@ const server = net.createServer(function(socket) {
 
                 case 'linst': // list intances
 					serv_publisher.keys(config.serv_pfx + '*', function (err, keys) {
-						if (err) return console.log(err);
+						if (err && config.debug_mode) return console.log(err);
 						if (socket.writable) socket.write(keys.join('\n') + '\n');
 							
 					});
@@ -349,7 +348,7 @@ const server = net.createServer(function(socket) {
                 default:
                 	var msg = 'bad command [' + data.toString().trim() + ']: Use "help" to list all available commands\n';
                 	if (socket.writable) socket.write(msg);
-                    console.log(msg);
+                    if (config.debug_mode) console.log(msg);
             }
         }
     });
@@ -381,7 +380,7 @@ const server = net.createServer(function(socket) {
 				break;
 				
 			default:
-				console.log('serv_subscriber->' + message + "\n");
+				if (config.debug_mode) console.log('serv_subscriber->' + message + "\n");
 		}
     });
     
@@ -411,7 +410,7 @@ const server = net.createServer(function(socket) {
 			clients.forEach(function(client) {
 				// Don't want to send it to sender
 				if (client.username == to) {
-					var msg = "from " + instance + "." + from + ": " + message + "\n";
+					var msg = "from " + instance + "." + from + ": " + message;
 					if (client.writable) {
 						client.write(msg);
 					}
@@ -429,6 +428,7 @@ const server = net.createServer(function(socket) {
 			clients.forEach(function(client) {
 				// Don't want to send it to sender
 				if (client.username == username) {
+					serv_publisher.del(username);
 					client.end();
 				}
 			});
