@@ -76,7 +76,7 @@ serv_subscriber.on("error", function (err) {
 });
 
 
-freeport(5000, 5100, function(err, freePort){
+freeport(5000, 5100, '127.0.0.1', function(err, freePort){
 
 //clear screen
 console.log('\033[2J');
