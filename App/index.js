@@ -97,13 +97,15 @@ const server = net.createServer(function(socket) {
     
     // Put this new client in the list
     clients.push(socket);
-	socket.setTimeout(config.socket_timeout * 1000);
+	
 	
     socket.write ("#\n");
-
+    
+    
+	socket.setTimeout(config.socket_timeout * 1000);
 	socket.on('timeout', () => {
 		if (socket.username!== null) {
-			serv_publisher.expire (socket.username, config.socket_timeout * 2);
+			serv_publisher.expire (socket.username, config.socket_timeout * 10);
 			socket.setTimeout(config.socket_timeout * 1000);
 		}
 	});
@@ -230,7 +232,7 @@ const server = net.createServer(function(socket) {
                     	}
                         socket.username = d[1].trim();
                         serv_publisher.set(d[1].trim() , JSON.stringify ({"instance" : serv_channel , "name": socket.name}));
-						serv_publisher.expire (d[1].trim(), config.socket_timeout * 2);
+						serv_publisher.expire (d[1].trim(), config.socket_timeout * 10);
                         if (socket.writable) socket.write('Welcome ' + socket.username + "\n");  
                     }
                     break;
