@@ -1,4 +1,4 @@
 Old
 node_modules
 data
-logs
+*.log

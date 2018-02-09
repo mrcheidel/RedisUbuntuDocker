@@ -2,6 +2,21 @@
 
 /*
 
+# Bring telnet back on macOS high Sierra
+# After I’ve upgraded macOS to high Sierra (10.13) the telnet was removed. So, in this topic we’ll bring the telnet back again.
+# First one you need a homebrew, if not let’s type this command to install them.
+#Install Homebrew
+
+    /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+    
+#Second, install telnet using homebrew
+
+   brew install telnet
+
+
+
+
+
 # http://www.toptip.ca/2010/02/linux-eaddrnotavail-address-not.html
 # https://blog.dekstroza.io/ulimit-shenanigans-on-osx-el-capitan/
 # http://blog.caustik.com/2012/08/19/node-js-w1m-concurrent-connections/
@@ -34,7 +49,7 @@
 
    sudo  sysctl net.inet.ip.portrange.first=15435  
    
-# sudo launchctl limit maxfiles 524288 524288
+   sudo launchctl limit maxfiles 1000000 1000000
 
 
 */
@@ -358,15 +373,15 @@ const server = net.createServer(function(socket) {
 
 }).on('listening', () => {
   // handle errors here
-   console.log('Socker server running at port', server.address().port);
-   
-   //  Add Data for the Discovery Process
-   serv_channel = config.serv_pfx + server.address().port;
-   serv_subscriber.set(serv_channel , JSON.stringify(server.address()));
-   serv_subscriber.expire (serv_channel, config.serv_timeout);
+	console.log('Socker server running at port', server.address().port);
 
-   	serv_subscriber.subscribe(serv_channel); 
-   	serv_subscriber.on("message", function(channel, message) {
+	//  Add Data for the Discovery Process
+	serv_channel = config.serv_pfx + server.address().port;
+	serv_subscriber.set(serv_channel , JSON.stringify(server.address()));
+	serv_subscriber.expire (serv_channel, config.serv_timeout);
+	serv_subscriber.subscribe(serv_channel); 
+	
+	serv_subscriber.on("message", function(channel, message) {
 		var d = csplit(message.toString('ascii'), ' ', 3);
 		if (d.length == 0) return;
 		switch (d[0].toLowerCase()) {
@@ -376,15 +391,15 @@ const server = net.createServer(function(socket) {
 				var msg  = d[3];
 				msgto(msg , to, from, channel);
 				break;
-				
+			
 			case 'kill':
 				kill(d[1], channel);
 				break;
-				
+			
 			default:
 				if (config.debug_mode) console.log('serv_subscriber->' + message + "\n");
 		}
-    });
+	});
     
    // Add KeepAlive 
    setInterval(
