@@ -40,6 +40,7 @@ function Dummy(i){
 		fs.appendFile('error.log', "\n-- Error --------------------------------------\n" + exception.stack + "\n", function (err) {
   			if (err) console.log (err.toString());
 		});   
+		this.end();
     });
 
 	this.socket.on('end', () => {
@@ -47,13 +48,13 @@ function Dummy(i){
 	});
 
 
-    this.socket.connect(5000, '127.0.0.1');
+    this.socket.connect(4500, '127.0.0.1');
 }
 
 
 var i = 0;
 var myVar = setInterval(function () {
-	if (i < 20000){
+	if (i < 8000){
 	 	clients.push(new Dummy(i));
 	 	i++;
 	} else {

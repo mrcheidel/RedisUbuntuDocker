@@ -18,6 +18,7 @@
   "author": "Claudio Heidel Schemberger",
   "license": "ISC",
   "dependencies": {
-    "redis": "^2.8.0"
+    "redis": "^2.8.0",
+    "rr": "^0.1.0"
   }
 }
