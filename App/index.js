@@ -75,7 +75,7 @@ var config = {
 	"serv_port_start": 5000,
 	"serv_port_end": 5100,
 	"socket_timeout": 10,
-	"debug_mode" : true
+	"debug_mode" : false
 };
 
 if (cluster.isMaster) {
@@ -87,8 +87,11 @@ if (cluster.isMaster) {
 		new_worker_env["FORK_NUMBER"] = i;
 		cluster.fork(new_worker_env);
 	}
+	process.title = process.title + ' master ';
 } else {
 
+	process.title = process.title + ' worker ' + process.env['FORK_NUMBER'];
+	
 	var serv_subscriber = redis.createClient(config.redis_port, config.redis_host);
 	var serv_publisher  = redis.createClient(config.redis_port, config.redis_host);
 
@@ -183,7 +186,12 @@ function newSocket(socket) {
 	});
 
     socket.on('error', function(e) {
-        var msg = "\n" + new Date().toJSON() +  "\n-- Socket Error --\nUsername: " + socket.username + "\n" + e.stack || e + "\n";
+        var msg = "\n" + new Date().toJSON() + "\n" +
+                  "-- Socket Error --" + "\n" +
+                  "On: " + socket.localAddress + ":" + socket.localPort +  "\n" +
+                  "Username: " + socket.username +  "\n" + 
+                  e.stack || e + "\n";
+                  
 		fs.appendFile('logs/socket_error.log', msg , function (err) {
   			if (err && config.debug_mode) console.log (err.toString());
 		});  
@@ -361,6 +369,14 @@ function newSocket(socket) {
                 case 'whoami':
                     if (socket.writable) socket.write(socket.username + "\n");
                     break;
+                    
+                case 'sname':
+                    if (socket.writable) socket.write(serv_channel + "\n");
+                    break;
+                    
+                case 'sadd':
+                    if (socket.writable) socket.write(socket.localAddress + ":" + socket.localPort + "\n");
+                    break;
 
                 case 'kill':
                 	var username = d[1];
@@ -420,6 +436,9 @@ function newSocket(socket) {
                 	msg+= '  - <pub> [channel] [message] Publish a message on an channel\n';
                 	msg+= '  - <usub> [channel] Unsubscribe the current username to on an channel\n';
                 	msg+= '  - <hlth> Show the memory used by the serverl\n';
+                	msg+= '  - <sname> Show the current Server name\n';
+                	msg+= '  - <sadd> Show the current Server Address\n';
+                	
                     if (socket.writable) socket.write(msg);
                     break;
 

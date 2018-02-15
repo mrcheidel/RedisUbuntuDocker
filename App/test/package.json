@@ -18,6 +18,8 @@
   "author": "Claudio Heidel Schemberger",
   "license": "ISC",
   "dependencies": {
+    "native-dns": "^0.7.0",
+    "quarry-dns": "^0.6.2",
     "redis": "^2.8.0",
     "rr": "^0.1.0"
   }

@@ -8,6 +8,8 @@ var net     = require('net');
 var clients = [];
 var fs      = require('fs');
 
+process.title = process.title + ' test case';
+
 function Dummy(i){
     this.socket = require('net').Socket();
     this.socket.setTimeout(600 * 1000); //10 minutos
@@ -21,15 +23,14 @@ function Dummy(i){
     	if (data.toString().substring(0, 1) == "#"){
     		this.write('lgn ' + this.user + '\n');
     	} else if (data.toString().substring(0, 7) == "Welcome") {
-   			setTimeout((function () {
-    			this.write('msg ' + this.user +' Hola\n');
-				setTimeout((function () {
-					this.write('exit\n');
-				}).bind(this), 180 * 1000);
-    		}).bind(this), 180 * 1000);
+   			setTimeout(function (socket) {
+    			socket.write('msg ' + socket.user +' Hola\n');
+				setTimeout(function (socket) {
+					socket.write('exit\n');
+				}, 60 * 1000, socket);
+    		}, 60 * 1000, this);
 
     	} else {
-    
     		console.log (data.toString());
     	}
     });

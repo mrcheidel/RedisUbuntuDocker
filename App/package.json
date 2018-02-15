@@ -18,7 +18,8 @@
   "author": "Claudio Heidel Schemberger",
   "license": "ISC",
   "dependencies": {
-    "redis": "^2.8.0",
-    "find-free-port": "^1.1.1"
+    "find-free-port": "^1.1.1",
+    "rainbow-dns": "^4.0.0",
+    "redis": "^2.8.0"
   }
 }
